@@ -9,6 +9,8 @@ import (
 	"os/signal"
 	"sync/atomic"
 	"time"
+
+	"github.com/edouardparis/spark/views"
 )
 
 type key int
@@ -37,7 +39,8 @@ func (s *Server) Run() {
 		defer cancel()
 
 		s.SetKeepAlivesEnabled(false)
-		if err := s.Shutdown(ctx); err != nil {
+		err := s.Shutdown(ctx)
+		if err != nil {
 			s.ErrorLog.Fatalf("Could not gracefully shutdown the server: %v\n", err)
 		}
 		close(done)
@@ -45,7 +48,8 @@ func (s *Server) Run() {
 
 	s.ErrorLog.Println("Server is ready to handle requests at", s.Addr)
 	atomic.StoreInt32(&healthy, 1)
-	if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	err := s.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
 		s.ErrorLog.Fatalf("Could not listen on %s: %v\n", s.Addr, err)
 	}
 
@@ -56,8 +60,9 @@ func (s *Server) Run() {
 
 func New(listenAddr string) *Server {
 	router := http.NewServeMux()
-	router.Handle("/", index())
+	router.Handle("/", views.Index())
 	router.Handle("/healthcheck", healthcheck())
+	router.Handle("/api/v1/charges", views.Charges())
 
 	logger := log.New(os.Stdout, "http: ", log.LstdFlags)
 	logger.Println("Server is starting...")
@@ -73,29 +78,6 @@ func New(listenAddr string) *Server {
 			ErrorLog: logger,
 		},
 	}
-}
-
-func index() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
-			return
-		}
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "Hello, World!")
-	})
-}
-
-func healthcheck() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if atomic.LoadInt32(&healthy) == 1 {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		w.WriteHeader(http.StatusServiceUnavailable)
-	})
 }
 
 func logging(logger *log.Logger) func(http.Handler) http.Handler {
@@ -125,4 +107,14 @@ func tracing(nextRequestID func() string) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+func healthcheck() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.LoadInt32(&healthy) == 1 {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+	})
 }
