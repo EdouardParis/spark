@@ -11,5 +11,5 @@ type Charge struct {
 	PaymentHash    string `json:"payment_hash"`
 	PaymentRequest string `json:"payment_request"`
 	Created        int64  `json:"created"`
-	Updated        int64  `json:"created"`
+	Updated        int64  `json:"updated"`
 }
