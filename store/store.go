@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"sync"
 	"time"
 
@@ -63,4 +64,40 @@ func UpdateCharge(charge *resources.Charge) error {
 
 	charges.objects[charge.ID] = charge
 	return nil
+}
+
+func ListCharges(page, size int) []*resources.Charge {
+	return listCharges(page, size, charges.objects)
+}
+
+func listCharges(page, size int, objects map[string]*resources.Charge) []*resources.Charge {
+	l := len(objects)
+	if size == 0 || l == 0 || page*size > l {
+		return []*resources.Charge{}
+	}
+
+	list := make([]*resources.Charge, l)
+	i := 0
+	for k := range objects {
+		list[i] = objects[k]
+		i++
+	}
+
+	sort.SliceStable(list, func(i, j int) bool {
+		return list[i].Created > list[j].Created
+	})
+
+	if page == 0 {
+		if size > l {
+			return list
+		}
+
+		return list[:size]
+	}
+
+	if (page+1)*size > l {
+		return list[page*size:]
+	}
+
+	return list[page*size : (page+1)*size]
 }
