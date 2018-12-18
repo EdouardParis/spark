@@ -3,10 +3,13 @@ package views
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"strconv"
 
 	"github.com/edouardparis/spark/payloads"
 	"github.com/edouardparis/spark/resources"
+	"github.com/edouardparis/spark/store"
 )
 
 func Index() http.Handler {
@@ -38,8 +41,14 @@ func Charges() http.Handler {
 }
 
 func createCharge(w http.ResponseWriter, r *http.Request) {
-	payload := &payloads.Charge{}
-	err := json.NewDecoder(r.Body).Decode(payload)
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	payload := payloads.Charge{}
+	err = json.Unmarshal(body, &payload)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -50,7 +59,8 @@ func createCharge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	charge := newCharge(payload)
+	charge := resources.NewCharge(&payload)
+	store.InsertCharge(charge)
 
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(charge)
@@ -63,10 +73,37 @@ func createCharge(w http.ResponseWriter, r *http.Request) {
 }
 
 func listCharge(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintln(w, "Hello, you!")
-}
+	var (
+		err    error
+		page   = 0
+		size   = 30
+		params = r.URL.Query()
+	)
 
-func newCharge(payload *payloads.Charge) *resources.Charge {
-	return &resources.Charge{}
+	pageStr := params.Get("page")
+	if pageStr != "" {
+		page, err = strconv.Atoi(pageStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+
+	sizeStr := params.Get("size")
+	if sizeStr != "" {
+		size, err = strconv.Atoi(sizeStr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+	}
+
+	list := store.ListCharges(page, size)
+	err = json.NewEncoder(w).Encode(list)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
