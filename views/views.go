@@ -3,7 +3,6 @@ package views
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 
@@ -41,14 +40,7 @@ func Charges() http.Handler {
 }
 
 func createCharge(w http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	payload := payloads.Charge{}
-	err = json.Unmarshal(body, &payload)
+	payload, err := payloads.NewChargePayload(r)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -59,7 +51,7 @@ func createCharge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	charge := resources.NewCharge(&payload)
+	charge := resources.NewCharge(payload)
 	store.InsertCharge(charge)
 
 	w.Header().Set("Content-Type", "application/json")
