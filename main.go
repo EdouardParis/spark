@@ -8,7 +8,7 @@ import (
 
 func main() {
 	var listenAddr string
-	flag.StringVar(&listenAddr, "listen-addr", ":8080", "server listen address")
+	flag.StringVar(&listenAddr, "host", ":8080", "server listen address")
 	flag.Parse()
 
 	server.New(listenAddr).Run()
